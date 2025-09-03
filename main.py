@@ -1,6 +1,3 @@
-# AI-Powered Meeting Intelligence System
-# Core Implementation with Scraping and Report Generation
-
 import os
 import json
 import time
