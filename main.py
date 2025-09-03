@@ -312,170 +312,156 @@ class IntelligenceScraper:
 # ====================== AI ANALYSIS MODULE ======================
 
 class AIAnalyzer:
-    """GPT-4 powered analysis engine"""
-    
+    """GPT-powered analysis engine"""
+
     def __init__(self, model="gpt-3.5-turbo"):
         self.model = model  # Use gpt-4 for better results
-    
+
     def extract_background(self, raw_data: Dict) -> Dict:
         """Extract and structure background information"""
-        
+        print("[AIAnalyzer] Extracting background for:", raw_data['person']['name'])
+
         prompt = f"""
         Based on the following information about {raw_data['person']['name']}:
-        
+
         LinkedIn: {json.dumps(raw_data.get('linkedin', {}), indent=2)}
         Organization: {json.dumps(raw_data.get('organization', {}), indent=2)}
         Search Results: {json.dumps(raw_data.get('google_results', [])[:3], indent=2)}
-        
+
         Extract and provide:
-        1. Educational background (institutions, degrees, years if available)
-        2. Career progression (key positions, companies, timeline)
+        1. Educational background
+        2. Career progression
         3. Areas of expertise
         4. Notable achievements
         5. Current responsibilities
-        
+
         Format as JSON with keys: education, career_progression, expertise, achievements, current_role
         """
-        
+
         try:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are an expert at analyzing professional backgrounds and extracting key information."},
+                    {"role": "system", "content": "You are an expert at analyzing professional backgrounds."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
                 max_tokens=1000
             )
-            
+
             result = response.choices[0].message.content
-            # Parse JSON response
+            print("[AIAnalyzer] Background raw response:", result[:200], "...")
             try:
                 return json.loads(result)
             except:
                 return {"raw_response": result}
-                
+
         except Exception as e:
-            print(f"AI extraction error: {e}")
+            print(f"[AIAnalyzer] AI extraction error: {e}")
             return {}
-    
+
     def analyze_recent_activities(self, raw_data: Dict) -> List[str]:
         """Analyze recent activities and engagements"""
-        
+        print("[AIAnalyzer] Analyzing recent activities...")
+
         news_items = raw_data.get('news', [])
-        news_text = "\n".join([f"- {item['title']}: {item['description']}" 
+        news_text = "\n".join([f"- {item['title']}: {item['description']}"
                                for item in news_items[:5]])
-        
+
         prompt = f"""
         Based on these recent news and activities about {raw_data['person']['name']}:
-        
+
         {news_text}
-        
+
         Provide 5 key recent activities, speeches, or initiatives in bullet points.
-        Focus on the most impactful and recent items.
-        Each point should be specific and actionable for a business meeting context.
         """
-        
+
         try:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are an expert at identifying key professional activities and initiatives."},
+                    {"role": "system", "content": "You are an expert at identifying key professional activities."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
                 max_tokens=500
             )
-            
+
             result = response.choices[0].message.content
-            # Parse bullet points
-            activities = [line.strip('- •').strip() 
-                         for line in result.split('\n') 
-                         if line.strip().startswith(('-', '•'))]
-            
+            print("[AIAnalyzer] Recent activities raw response:", result[:200], "...")
+            activities = [line.strip('- •').strip()
+                          for line in result.split('\n')
+                          if line.strip().startswith(('-', '•'))]
+
             return activities[:5]
-            
+
         except Exception as e:
-            print(f"AI recent activities error: {e}")
+            print(f"[AIAnalyzer] AI recent activities error: {e}")
             return []
-    
+
     def generate_pitch_points(self, person_data: Dict, company_context: Dict) -> List[str]:
         """Generate 5 personalized pitch points"""
-        
+        print("[AIAnalyzer] Generating pitch points...")
+
+        # Ensure solutions are always strings
+        solutions = [str(s) for s in company_context.get('solutions', [])]
+
         prompt = f"""
-        You are preparing a sales meeting brief. Generate 5 highly personalized pitch points for meeting with:
-        
+        You are preparing a sales meeting brief. Generate 5 highly personalized pitch points.
+
         Person: {person_data['person']['name']}
         Title: {person_data['person']['title']}
         Organization: {person_data['person']['organization']}
-        
+
         Background: {json.dumps(person_data.get('background', {}), indent=2)}
         Recent Activities: {json.dumps(person_data.get('recent_activities', []), indent=2)}
-        
+
         Our Company: {company_context['company']}
-        Our Solutions: {', '.join(company_context['solutions'])}
-        
-        Create 5 strategic talking points that:
-        1. Connect our solutions to their specific initiatives
-        2. Reference their recent work or statements
-        3. Align with their organization's goals
-        4. Show understanding of their challenges
-        5. Propose specific value propositions
-        
-        Make each point specific, actionable, and directly relevant to this person.
-        Format as 5 clear bullet points.
+        Our Solutions: {', '.join(solutions)}
         """
-        
+
         try:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are an expert sales strategist who creates highly personalized pitch points."},
+                    {"role": "system", "content": "You are an expert sales strategist."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.5,
                 max_tokens=600
             )
-            
+
             result = response.choices[0].message.content
-            # Parse bullet points
-            points = [line.strip('- •').strip() 
-                     for line in result.split('\n') 
-                     if line.strip().startswith(('-', '•', '1.', '2.', '3.', '4.', '5.'))]
-            
-            # Clean up numbering if present
+            print("[AIAnalyzer] Pitch points raw response:", result[:200], "...")
+            points = [line.strip('- •').strip()
+                      for line in result.split('\n')
+                      if line.strip().startswith(('-', '•', '1.', '2.', '3.', '4.', '5.'))]
+
             points = [re.sub(r'^\d+\.\s*', '', point) for point in points]
-            
+
             return points[:5]
-            
+
         except Exception as e:
-            print(f"AI pitch points error: {e}")
+            print(f"[AIAnalyzer] AI pitch points error: {e}")
             return ["Error generating pitch points"]
-    
+
     def identify_connections(self, person_data: Dict, company_context: Dict) -> List[str]:
-        """Identify connection opportunities and mutual interests"""
-        
+        """Identify connection opportunities"""
+        print("[AIAnalyzer] Identifying connections...")
+
+        solutions = [str(s) for s in company_context.get('solutions', [])]
+
         prompt = f"""
         Identify connection opportunities between our company and {person_data['person']['name']}:
-        
+
         Their Background: {json.dumps(person_data.get('background', {}), indent=2)}
         Their Organization: {person_data['person']['organization']}
         Their Initiatives: {json.dumps(person_data.get('initiatives', []), indent=2)}
-        
+
         Our Company: {company_context['company']}
-        Our Solutions: {', '.join(company_context['solutions'])}
-        
-        Provide 5 connection opportunities such as:
-        - Shared alumni networks or educational backgrounds
-        - Regional or geographic alignments
-        - Common technology interests
-        - Partnership opportunities
-        - Mutual contacts or organizations
-        - Industry initiatives alignment
-        
-        Be specific and actionable.
+        Our Solutions: {', '.join(solutions)}
         """
-        
+
         try:
             response = client.chat.completions.create(
                 model=self.model,
@@ -486,16 +472,17 @@ class AIAnalyzer:
                 temperature=0.4,
                 max_tokens=400
             )
-            
+
             result = response.choices[0].message.content
-            connections = [line.strip('- •').strip() 
-                          for line in result.split('\n') 
-                          if line.strip().startswith(('-', '•'))]
-            
+            print("[AIAnalyzer] Connections raw response:", result[:200], "...")
+            connections = [line.strip('- •').strip()
+                           for line in result.split('\n')
+                           if line.strip().startswith(('-', '•'))]
+
             return connections[:5]
-            
+
         except Exception as e:
-            print(f"AI connections error: {e}")
+            print(f"[AIAnalyzer] AI connections error: {e}")
             return []
 
 # ====================== BRIEFING GENERATOR ======================
